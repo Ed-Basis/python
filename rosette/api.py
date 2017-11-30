@@ -535,7 +535,7 @@ class EndpointCaller(object):
         else:
             if self.debug:
                 headers['X-RosetteAPI-Devel'] = True
-            self.logger.info('operate: ' + url)
+            self.logger.debug('call url: ' + url)
             headers['Accept'] = "application/json"
             headers['Accept-Encoding'] = "gzip"
             headers['Content-Type'] = "application/json"

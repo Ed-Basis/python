@@ -6,46 +6,13 @@ from __future__ import print_function
 
 import argparse
 
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-
-from examples.Rosette import Rosette
-from rosette.api import DocumentParameters
+from examples.rosette import Rosette
+from examples.embeddings import Embeddings
 
 
-class Embeddings(object):
-    rosette = None
-
-    def __init__(self, rosette):
-        self.rosette = rosette
-
-    @staticmethod
-    def vector_similarity(v1, v2):
-        if not isinstance(v1, np.ndarray):
-            v1 = np.array(v1)
-        if not isinstance(v2, np.ndarray):
-            v2 = np.array(v2)
-        return np.divide(
-            np.dot(v1, v2),
-            np.sqrt(np.dot(v1, v1)) * np.sqrt(np.dot(v2, v2))
-        )
-
-    def text_embedding(self, data):
-        params = DocumentParameters()
-        params["content"] = data
-        params["language"] = "eng"
-        return self.rosette.text_embedding(params)
-
-    def similarity(self, data1, data2):
-        e1 = self.rosette.text_embedding(data1)['embedding']
-        e2 = self.rosette.text_embedding(data2)['embedding']
-        return cosine_similarity([e1, e2])[0,1]
-        # return self.vector_similarity(e1, e2)
-
-
-def embedding_similarity(key, url, data1, data2):
+def embedding_similarity(key, url, arg1, arg2):
     rosette = Rosette(key, url)
-    return Embeddings(rosette).similarity(data1, data2)
+    return Embeddings(rosette).similarity(arg1, arg2)
 
 
 def parse_command_line():

@@ -8,65 +8,72 @@ from rosette.api import API, DocumentParameters
 
 class Rosette(object):
     """
-    Rosette API implementation
+    Wrapper around Rosette API
     See: https://github.com/rosette-api/python/tree/develop/examples
+    TODO: Accept URI inputs
     """
 
     api = None
 
-    def __init__(self, key, url, threads=4):
+    def __init__(self, key=None, url='https://api.rosette.com/rest/v1/', threads=4):
         # Create an API instance
         self.api = API(user_key=key, service_url=url)
         self.api.max_pool_size = threads
         self.api.set_custom_headers('X-RosetteAPI-App', 'python-app')
 
-    def call(self, endpoint, data=None):
-        return self.__getattribute__(endpoint)(data)
+    def call(self, endpoint, data=None, lang=None):
+        '''
+        Calls specified Rosette API endpoint
+        :param endpoint: endpoint to call, e.g. 'entities'
+        :param data: flat text data to process
+        :return:
+        '''
+        return self.__getattribute__(endpoint)(data, lang)
 
-    def ping(self, data=None):
+    def ping(self, data=None, lang=None):
         return self.api.ping()
 
-    def info(self, data=None):
+    def info(self, data=None, lang=None):
         return self.api.info()
 
-    def language(self, data):
+    def language(self, data, lang=None):
         logging.debug('Rosette.language: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         return self.api.language(params)
 
-    def transliteration(self, data):
+    def transliteration(self, data, lang=None):
         logging.debug('Rosette.transliteration: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         return self.api.transliteration(params)
 
-    def sentences(self, data):
+    def sentences(self, data, lang=None):
         logging.debug('Rosette.sentences: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         return self.api.sentences(params)
 
-    def morphology(self, data):
+    def morphology(self, data, lang=None):
         logging.debug('Rosette.morphology: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         return self.api.morphology(params)
 
-    def tokens(self, data):
+    def tokens(self, data, lang=None):
         logging.debug('Rosette.tokens: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         return self.api.tokens(params)
 
-    def entities(self, data):
+    def entities(self, data, lang=None):
         logging.debug('Rosette.entities: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         params['genre'] = 'social-media'
         return self.api.entities(params)
 
-    def entities_offsets(self, data):
+    def entities_offsets(self, data, lang=None):
         logging.debug('Rosette.entities_offsets: "%s"', data)
         self.api.set_url_parameter("output", "rosette")
         params = DocumentParameters()
@@ -76,31 +83,33 @@ class Rosette(object):
         self.api.set_url_parameter("output", None)
         return result
 
-    def sentiment(self, data):
+    def sentiment(self, data, lang=None):
         logging.debug('Rosette.sentiment: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         return self.api.sentiment(params)
 
-    def categories(self, data):
+    def categories(self, data, lang=None):
         logging.debug('Rosette.categories: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         return self.api.categories(params)
 
-    def text_embedding(self, data):
+    def text_embedding(self, data, lang=None):
         logging.debug('Rosette.text_embedding: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
+        if (lang):
+            params['language'] = lang
         return self.api.text_embedding(params)
 
-    def dependencies(self, data):
+    def dependencies(self, data, lang=None):
         logging.debug('Rosette.dependencies: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         return self.api.syntax_dependencies(params)
 
-    def relationships(self, data):
+    def relationships(self, data, lang=None):
         logging.debug('Rosette.relationships: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
