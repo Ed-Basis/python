@@ -5,6 +5,7 @@ Example code to call Rosette API to get text vectors from a piece of text.
 from __future__ import print_function
 
 import argparse
+import logging
 
 from examples.rosette import Rosette
 from examples.embeddings import Embeddings
@@ -16,6 +17,8 @@ def embedding_similarity(key, url, arg1, arg2):
 
 
 def parse_command_line():
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(levelname)-7s %(message)s')
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      description='Calculates the embedding similarity between two texts')
     parser.add_argument('-k', '--key', help='Rosette API Key')

@@ -130,6 +130,8 @@ def parse_command_line():
     args = parser.parse_args()
     if args.url == 'local':
         args.url = 'http://localhost:8181/rest/v1/'
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(levelname)-7s %(message)s')
     return args
 
 

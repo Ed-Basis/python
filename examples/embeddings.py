@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-
+import logging
 import sys
 
 import numpy as np
@@ -65,6 +65,8 @@ class Embeddings(object):
 
 
 def main(args):
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(levelname)-7s %(message)s')
     pass
 
 
