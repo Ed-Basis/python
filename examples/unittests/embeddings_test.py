@@ -3,13 +3,12 @@ import logging
 import unittest
 
 from examples.embeddings import Embeddings
-from examples.rosette import Rosette
+from examples.Rosette import Rosette
 
 
 class TestEmbeddings(unittest.TestCase):
     def setUp(self):
-        logging.basicConfig(level=logging.INFO,
-                            format='%(asctime)s %(levelname)-7s %(message)s')
+        logging.basicConfig(level=logging.WARN, format='%(asctime)s %(levelname)-7s %(message)s')
         self.embeddings = Embeddings(Rosette(url='http://localhost:8181/rest/v1/'))
 
     def test_similarity(self):

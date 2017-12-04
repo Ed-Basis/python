@@ -7,8 +7,8 @@ from __future__ import print_function
 import argparse
 import logging
 
-from examples.rosette import Rosette
 from examples.embeddings import Embeddings
+from examples.Rosette import Rosette
 
 
 def embedding_similarity(key, url, arg1, arg2):

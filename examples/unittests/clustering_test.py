@@ -2,27 +2,36 @@
 import logging
 import unittest
 
-from examples.clustering import Clusterer
-from examples.embeddings import Embeddings
-from examples.rosette import Rosette
+import numpy as np
+
+from examples.Rosette import Rosette
+from examples.clustering import Clusterer, Trial
+
+# TODO: imports lead to a bunch of ImportWarning's, unclear why
 
 
 class TestClusterer(unittest.TestCase):
     def setUp(self):
-        logging.basicConfig(level=logging.INFO,
-                            format='%(asctime)s %(levelname)-7s %(message)s')
-        self.clusterer = Clusterer(rosette=Rosette(url='http://localhost:8181/rest/v1/'),
-                                   opts=None)
+        logging.basicConfig(level=logging.WARN, format='%(asctime)s %(levelname)-7s %(message)s')
 
-    def test_embeddings(self):
-        texts = [
-            'Grandma got run over by a reindeer',
-            'Grandpa got run over by a tractor',
-            'Wile E. got run over by a steamroller',
-            'I would gladly pay you Tuesday for a hamburger today']
-        embeddings = self.clusterer.embeddings(texts)
-        self.assertEqual(4, len(embeddings))
-        self.assertEqual(300, len(embeddings[0]))
+    def test_trial(self):
+        a = Trial()
+        b = Trial(n_clusters=3, score=0.2)
+        c = Trial(n_clusters=5, score=0.1)
+        a.compare(b).compare(c)
+        self.assertEqual(3, a.n_clusters)
+        self.assertEqual(0.2, a.score)
+
+    def test_clusterer(self):
+        rosette = Rosette(url='http://localhost:8181/rest/v1/')
+        data = ['cookie', 'cake', 'muffin',
+                'apple', 'orange', 'banana', 'pear', 'apricot',
+                'NASA', 'star', 'black hole', 'telescope',
+                'tennis', 'Andre Agassi', 'Martina Navratilova']
+        clusterer = Clusterer(rosette=rosette, min_clusters=2, max_clusters=8)
+        clusterer.run(data)
+        # np.save('data', clusterer.embeddings)
+        self.assertEqual(3, clusterer.best.n_clusters)
 
 
 if __name__ == '__main__':

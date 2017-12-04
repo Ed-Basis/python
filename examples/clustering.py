@@ -4,44 +4,13 @@
 # =======================================
 #
 # This is an example showing how the scikit-learn can be used to cluster
-# documents by topics using a bag-of-words approach. This example uses
-# a scipy.sparse matrix to store the features instead of standard numpy arrays.
-#
-# Two feature extraction methods can be used in this example:
-#
-#   - TfidfVectorizer uses a in-memory vocabulary (a python dict) to map the most
-#     frequent words to features indices and hence compute a word occurrence
-#     frequency (sparse) matrix. The word frequencies are then reweighted using
-#     the Inverse Document Frequency (IDF) vector collected feature-wise over
-#     the corpus.
-#
-#   - HashingVectorizer hashes word occurrences to a fixed dimensional space,
-#     possibly with collisions. The word count vectors are then normalized to
-#     each have l2-norm equal to one (projected to the euclidean unit-ball) which
-#     seems to be important for k-means to work in high dimensional space.
-#
-#     HashingVectorizer does not provide IDF weighting as this is a stateless
-#     model (the fit method does nothing). When IDF weighting is needed it can
-#     be added by pipelining its output to a TfidfTransformer instance.
-#
-# Two algorithms are demoed: ordinary k-means and its more scalable cousin
-# minibatch k-means.
-#
-# Additionally, latent semantic analysis can also be used to reduce dimensionality
-# and discover latent patterns in the data.
+# text embeddings.
 #
 # It can be noted that k-means (and minibatch k-means) are very sensitive to
-# feature scaling and that in this case the IDF weighting helps improve the
-# quality of the clustering by quite a lot as measured against the "ground truth"
-# provided by the class label assignments of the 20 newsgroups dataset.
-#
-# This improvement is not visible in the Silhouette Coefficient which is small
-# for both as this measure seem to suffer from the phenomenon called
+# feature scaling. This is visible in the Silhouette Coefficient,
+# as this measure seems to suffer from the phenomenon called
 # "Concentration of Measure" or "Curse of Dimensionality" for high dimensional
-# datasets such as text data. Other measures such as V-measure and Adjusted Rand
-# Index are information theoretic based evaluation scores: as they are only based
-# on cluster assignments rather than distances, hence not affected by the curse
-# of dimensionality.
+# datasets such as text data.
 #
 # Note: as k-means is optimizing a non-convex objective function, it will likely
 # end up in a local optimum. Several runs with independent random init might be
@@ -66,133 +35,109 @@ from sklearn import metrics
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.datasets import fetch_20newsgroups
 
-from examples.rosette import Rosette
+from examples.Rosette import Rosette
+from examples.embeddings import Embeddings
+from rosette.api import RosetteException
+
+
+class Trial(object):
+    """
+    Results of a single clustering trial, or best of a set of trials.
+    """
+    n_clusters = 0
+    clusterer = None
+    score = -1.0
+
+    def __init__(self, n_clusters=n_clusters, clusterer=None, score=-1.0):
+        self.n_clusters = n_clusters
+        self.clusterer = clusterer
+        self.score = score
+
+    def compare(self, trial):
+        if trial.score > self.score:
+            self.n_clusters = trial.n_clusters
+            self.clusterer = trial.clusterer
+            self.score = trial.score
+        return self
 
 
 class Clusterer(object):
-    rosette = None
-    opts = None
+    embeddings = None
+    best = None
 
-    best_clusterer = None
-    best_n_clusters = 0
-    best_median_score = -1
-
-    def __init__(self, rosette, opts):
+    def __init__(self, rosette=None, min_clusters=3, max_clusters=20, n_trials=5, n_iters=100,
+                 verbose=False):
         self.rosette = rosette
-        self.opts = opts
+        self.min_clusters = min_clusters
+        self.max_clusters = max_clusters
+        self.n_trials = n_trials
+        self.n_iters = n_iters
+        self.verbose = verbose
+        self.best = Trial()
 
-    def embeddings(self, data):
-        return [self.rosette.text_embedding(d)['embedding'] for d in data]
+    def run(self, data=None, embeddings=None):
+        if embeddings is None:
+            if data is None:
+                raise RosetteException("badData", "Must provide either data or embeddings", None)
+            elif self.rosette is None:
+                raise RosetteException("badData", "Must provide either embeddings or Rosette object", None)
+            else:
+                embeddings = np.asarray([self.rosette.text_embedding(d) for d in data])
+        self.embeddings = embeddings
+        self._run_clusters(embeddings)
+        logging.warning("best n_clusters: %d  score: %0.3f" % (self.best.n_clusters, self.best.score))
 
-    def run(self, data):
-        text_embeddings = self.embeddings(data)
-        for n_clusters in range(self.opts.min_clusters, self.opts.max_clusters + 1):
-            if n_clusters > self.best_n_clusters * 2 and n_clusters > self.best_n_clusters + 10:
+    def _run_clusters(self, X):
+        for n_clusters in range(self.min_clusters, self.max_clusters + 1):
+            if n_clusters > self.best.n_clusters * 2 and n_clusters > self.best.n_clusters + 10:
                 break
-            silhouette_scores = []
-            local_best_clusterer = None
-            local_best_score = -1
+            local_best = self._cluster_trials(X, n_clusters)
+            self.best.compare(local_best)
+        logging.warning("self.best.n_clusters: %d  self.best.score: %0.3f" %
+                        (self.best.n_clusters, self.best.score))
 
-            for i in range(self.opts.n_trials):
-                clusterer = MiniBatchKMeans(n_clusters=n_clusters, init='k-means++', n_init=3,
-                                            batch_size=1000, max_iter=self.opts.n_iters,
-                                            verbose=self.opts.verbose)
+    def _cluster_trials(self, X, n_clusters):
+        scores = []
+        local_best = Trial(clusterer=n_clusters)
 
-                logging.debug("Clustering sparse data with %s" % clusterer)
-                t0 = time()
-                clusterer.fit(X)
-                elapsed = time() - t0
-                logging.debug("elapsed: %0.3fs  " % (elapsed))
+        for i in range(self.n_trials):
+            trial = self._cluster(X, n_clusters)
+            scores.append(trial.score)
+            local_best.compare(trial)
 
-                logging.debug("Homogeneity: %0.3f" % metrics.homogeneity_score(labels, clusterer.labels_))
-                logging.debug("Completeness: %0.3f" % metrics.completeness_score(labels, clusterer.labels_))
-                logging.debug("V-measure: %0.3f" % metrics.v_measure_score(labels, clusterer.labels_))
-                logging.debug("Adjusted Rand-Index: %.3f" % metrics.adjusted_rand_score(labels, clusterer.labels_))
-                silhouette_score = metrics.silhouette_score(X, clusterer.labels_, sample_size=1000)
-                logging.info("elapsed: %0.3fs  n_clusters: %d  silhouette_score: %0.3f"
-                             % (elapsed, n_clusters, silhouette_score))
-                silhouette_scores.append(silhouette_score)
+        # keep the best-performing clusterer, but return the median score to avoid outliers
+        local_best.score = np.median(scores)
 
-                if silhouette_score > local_best_score:
-                    local_best_score = silhouette_score
-                    local_best_clusterer = clusterer
+        logging.warning("n_clusters: %d  score: %0.3f" % (n_clusters, local_best.score))
+        return local_best
 
-            median = np.median(silhouette_scores)
-            logging.info("n_clusters: %d  median_silhouette_score: %0.3f" % (n_clusters, median))
-
-            if median > self.best_median_score:
-                self.best_median_score = median
-                self.best_n_clusters = n_clusters
-                self.best_clusterer = local_best_clusterer
-
-        logging.warning("self.best_n_clusters: %d  self.best_silhouette_score: %0.3f" %
-                        (self.best_n_clusters, self.best_median_score))
-
-        # if self.best_clusterer and not self.opts.use_hashing:
-        #     logging.warning("Top terms per cluster:")
-        #
-        #     if self.opts.n_components:
-        #         original_space_centroids = svd.inverse_transform(self.best_clusterer.cluster_centers_)
-        #         order_centroids = original_space_centroids.argsort()[:, ::-1]
-        #     else:
-        #         order_centroids = self.best_clusterer.cluster_centers_.argsort()[:, ::-1]
-        #
-        #     terms = vectorizer.get_feature_names()
-        #     for i in range(self.best_n_clusters):
-        #         logging.warning("Cluster %d: %s", i,
-        #                         [terms[ind] for ind in order_centroids[i, :10]])
+    def _cluster(self, X, n_clusters):
+        clusterer = MiniBatchKMeans(init='k-means++',
+                                    n_clusters=n_clusters, n_init=3, batch_size=1000,
+                                    max_iter=self.n_iters,  # max_no_improvement=5,
+                                    verbose=self.verbose)
+        logging.debug("Clustering data with %s" % clusterer)
+        t0 = time()
+        clusterer.fit(X)
+        elapsed = time() - t0
+        silhouette_score = metrics.silhouette_score(X, clusterer.labels_, sample_size=1000)
+        # calinski_harabaz_score seems to be of little use for determining number of clusters,
+        #    as a lower number of clusters is always higher
+        # calinski_score = metrics.calinski_harabaz_score(X, clusterer.labels_)
+        logging.info("elapsed: %0.3fs  n_clusters: %d  silhouette_score: %0.3f"
+                     % (elapsed, n_clusters, silhouette_score))
+        return Trial(n_clusters, clusterer, silhouette_score)
 
 
-def parse_args(argv):
-    # parse commandline arguments
-    op = OptionParser()
-    op.add_option("--url", type=str, default='http://localhost:8181/rest/v1/',
-                  help="Rosette API URL.")
-    op.add_option("--lsa",
-                  dest="n_components", type="int", default=300,
-                  help="Preprocess documents with latent semantic analysis.")
-    op.add_option("--no-idf",
-                  action="store_false", dest="use_idf", default=True,
-                  help="Disable Inverse Document Frequency feature weighting.")
-    op.add_option("--use-hashing",
-                  action="store_true", default=False,
-                  help="Use a hashing feature vectorizer")
-    op.add_option("--n-features", type=int, default=10000,
-                  help="Maximum number of features (dimensions)"
-                       " to extract from text.")
-    op.add_option("--n-iters", type=int, default=100,
-                  help="Maximum number of iterations.")
-    op.add_option("--min-clusters", type=int, default=3,
-                  help="Minimum number of clusters.")
-    op.add_option("--max-clusters", type=int, default=40,
-                  help="Maximum number of clusters.")
-    op.add_option("--n-trials", type=int, default=7,
-                  help="Number of times to run each trial.")
-    op.add_option("--logging", type=str, default='WARN',
-                  help="Logging level (default WARN).")
-    op.add_option("--verbose",
-                  action="store_true", dest="verbose", default=False,
-                  help="Print progress reports inside k-means algorithm.")
-    (opts, args) = op.parse_args(argv)
-    if len(args) > 0:
-        op.error("this script takes no arguments.")
-        sys.exit(1)
-
-    logging.basicConfig(level=getattr(logging, opts.logging.upper()),
-                        format='%(asctime)s %(levelname)s %(message)s')
-
-    return opts
-
-
-def load_data():
+def _load_sample_data():
     # Load some categories from the training set
     categories = [
         # 'alt.atheism',
-        # 'comp.graphics',
-        # 'comp.os.ms-windows.misc',
-        # 'comp.sys.ibm.pc.hardware',
-        # 'comp.sys.mac.hardware',
-        # 'comp.windows.x',
+        'comp.graphics',
+        'comp.os.ms-windows.misc',
+        'comp.sys.ibm.pc.hardware',
+        'comp.sys.mac.hardware',
+        'comp.windows.x',
         # 'misc.forsale',
         'rec.autos',
         'rec.motorcycles',
@@ -209,18 +154,52 @@ def load_data():
         # 'talk.religion.misc',
     ]
     # Uncomment the following to include all categories
-    categories = None
-    logging.info("Loading 20 newsgroups dataset for categories: %s", categories or 'All')
-
+    # categories = None
+    logging.warning("Loading 20 newsgroups dataset for categories: %s", categories or 'All')
     dataset = fetch_20newsgroups(subset='all', categories=categories,
                                  remove=('headers', 'footers', 'quotes'),
                                  shuffle=True)
-
     logging.info("%d documents, %d categories", len(dataset.data), len(dataset.target_names))
+    return dataset.data
+
+
+def _parse_args(argv):
+    # parse commandline arguments
+    op = OptionParser()
+    op.add_option('--url', type=str, default='http://localhost:8181/rest/v1/', help='Rosette API URL.')
+    op.add_option('--file', type=str, help='File containing either numpy text embeddings or text data.')
+    op.add_option('--output', type=str, help='Output file for calculated text embeddings.')
+    op.add_option('--n-iters', type=int, default=100, help='Maximum number of iterations.')
+    op.add_option('--min-clusters', type=int, default=3, help='Minimum number of clusters.')
+    op.add_option('--max-clusters', type=int, default=100, help='Maximum number of clusters.')
+    op.add_option('--n-trials', type=int, default=5, help='Number of times to run each trial.')
+    op.add_option('--logging', type=str, default='INFO', help='Logging level (default WARN).')
+    op.add_option('--verbose', action='store_true', dest='verbose', default=False,
+                  help='Print progress reports inside k-means algorithm.')
+    (opts, args) = op.parse_args(argv)
+    if len(args) > 0:
+        op.error('this script takes no arguments.')
+        sys.exit(1)
+
+    logging.basicConfig(level=getattr(logging, opts.logging.upper()),
+                        format='%(asctime)s %(levelname)s %(message)s')
+    return opts
 
 
 if __name__ == '__main__':
-    opts = parse_args(sys.argv[1:])
-    rosette = Rosette(url=opts.url)
-    dataset = load_data()
-    clusterer = Clusterer(dataset.data, opts)
+    opts = _parse_args(sys.argv[1:])
+    data = None
+    embeddings = None
+    if opts.file:
+        (data, embeddings) = Embeddings.load(opts.file)
+    else:
+        data = _load_sample_data()
+    clusterer = Clusterer(rosette=Rosette(url=opts.url),
+                          min_clusters=opts.min_clusters,
+                          max_clusters=opts.max_clusters,
+                          n_trials=opts.n_trials,
+                          n_iters=opts.n_iters,
+                          verbose=opts.verbose)
+    clusterer.run(data=data, embeddings=embeddings)
+    if opts.output:
+        Embeddings.save(opts.output, clusterer.embeddings)

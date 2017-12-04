@@ -1,16 +1,20 @@
 #! /usr/bin/env python3
+
+from __future__ import print_function
+
 import argparse
 import json
 import logging
 
-from rosette.api import API, DocumentParameters
+import numpy as np
+
+from rosette.api import API, DocumentParameters, RosetteException
 
 
 class Rosette(object):
     """
-    Wrapper around Rosette API
-    See: https://github.com/rosette-api/python/tree/develop/examples
-    TODO: Accept URI inputs
+    Simplified wrapper around Rosette API (api.py)
+    TODO: Accept URI data source
     """
 
     api = None
@@ -22,13 +26,14 @@ class Rosette(object):
         self.api.set_custom_headers('X-RosetteAPI-App', 'python-app')
 
     def call(self, endpoint, data=None, lang=None):
-        '''
+        """
         Calls specified Rosette API endpoint
         :param endpoint: endpoint to call, e.g. 'entities'
         :param data: flat text data to process
+        :param lang: language of text (optional)
         :return:
-        '''
-        return self.__getattribute__(endpoint)(data, lang)
+        """
+        return self.__getattribute__(endpoint)(data=data, lang=lang)
 
     def ping(self, data=None, lang=None):
         return self.api.ping()
@@ -96,12 +101,36 @@ class Rosette(object):
         return self.api.categories(params)
 
     def text_embedding(self, data, lang=None):
+        """
+        Returns the text embedding vector for the specified data as a numpy array.
+        :param data: textual input
+        :param lang: language of text (optional)
+        :return: numpy array of decimal values
+        """
         logging.debug('Rosette.text_embedding: "%s"', data)
         params = DocumentParameters()
         params['content'] = data
         if (lang):
             params['language'] = lang
-        return self.api.text_embedding(params)
+        try:
+            return np.asarray(self.api.text_embedding(params)['embedding'])
+        except RosetteException as e:
+            if e.status == 'tooMuchData':
+                logging.info("%s: %s. Truncating data.", e.status, e.message)
+                return self.text_embedding(data[:50000])
+            elif e.status == 'unsupportedLanguage':
+                if 'xxx' in e.message:
+                    logging.debug("%s: %s. Returning zeros.", e.status, e.message)
+                else:
+                    logging.info("%s: %s. Processing as English: '%s'", e.status, e.message, data[:30])
+                    return self.text_embedding(data, 'eng')
+            elif e.status == 'notEnoughData':
+                logging.debug("%s: %s. Returning zeros.", e.status, e.message)
+            elif logging.getLogger().getEffectiveLevel() >= logging.INFO:
+                logging.info("%s: %s. Returning zeros: '%s'", e.status, e.message, data[:30])
+            else:
+                raise
+            return np.zeros(300)
 
     def dependencies(self, data, lang=None):
         logging.debug('Rosette.dependencies: "%s"', data)

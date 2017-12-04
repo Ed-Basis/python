@@ -23,8 +23,8 @@ class Embeddings(object):
         :param data2: second text argument
         :return: [-1,1] similarity, where 0 is no similarity and 1 is perfect similarity
         """
-        e1 = self.rosette.text_embedding(data1)['embedding']
-        e2 = self.rosette.text_embedding(data2)['embedding']
+        e1 = self.rosette.text_embedding(data1)
+        e2 = self.rosette.text_embedding(data2)
         similarity = cosine_similarity([e1, e2])
         return similarity[0, 1]
 
@@ -35,8 +35,7 @@ class Embeddings(object):
         :param data:
         :return: [-1,1] similarity, where 0 is no similarity and 1 is perfect similarity
         """
-        embeddings = [self.rosette.text_embedding(d) for d in data]
-        X = [e['embedding'] for e in embeddings]
+        X = [self.rosette.text_embedding(d) for d in data]
         similarity = cosine_similarity(X)
         # exclude identity values from average
         weights = np.ones_like(similarity) - np.identity(len(similarity))
@@ -44,24 +43,45 @@ class Embeddings(object):
 
     def mean(self, *data):
         """
-        Calculates the mean (average) text embedding vector over a array of texts.
+        Calculates the mean (average) text embedding vector over an array of texts.
         :param data: texts
         :return: mean text embedding vector
         """
-        embeddings = [self.rosette.text_embedding(d, 'eng')['embedding'] for d in data]
+        embeddings = [self.rosette.text_embedding(d, 'eng') for d in data]
         result = np.mean(embeddings, axis=0, dtype=np.float64)
         return result
 
     def match(self, data, category, lang=None):
         """
-        Calculates the text embedding similarity of a text argument to a text embedding.
+        Calculates the text embedding similarity of a text argument to a text embedding vector.
         :param data: text argument
         :param category: text embedding argument
         :return: [-1,1] similarity, where 0 is no similarity and 1 is perfect similarity
         """
-        e1 = self.rosette.text_embedding(data, lang)['embedding']
+        e1 = self.rosette.text_embedding(data, lang)
         similarity = cosine_similarity([e1, category])
         return similarity[0, 1]
+
+    @staticmethod
+    def load(filename):
+        """
+        Loads a file that could be either text data or numpy text embeddings,
+        determined by file extension.
+        :param filename: file to load
+        :return: ordered pair (data, embeddings), one of which will be None
+        """
+        data = None
+        embeddings = None
+        if str(filename).endswith('.npy'):
+            embeddings = np.load(filename)
+        else:
+            with open(filename) as f:
+                data = f.read()
+        return data, embeddings
+
+    @staticmethod
+    def save(filename, embeddings):
+        np.save(filename, embeddings)
 
 
 def main(args):

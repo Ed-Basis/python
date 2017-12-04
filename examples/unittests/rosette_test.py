@@ -1,11 +1,13 @@
 #! /usr/bin/env python3
+import logging
 import unittest
 
-from examples.rosette import Rosette
+from examples.Rosette import Rosette
 
 
 class TestRosette(unittest.TestCase):
     def setUp(self):
+        logging.basicConfig(level=logging.WARN, format='%(asctime)s %(levelname)-7s %(message)s')
         self.rosette = Rosette(url='http://localhost:8181/rest/v1/')
 
     def test_ping(self):
@@ -19,9 +21,7 @@ class TestRosette(unittest.TestCase):
         self.assertEqual(result['name'], 'Rosette API')
 
     def test_text_embedding(self):
-        result = self.rosette.text_embedding('Grandma got run over by a reindeer')
-        self.assertIsNotNone(result)
-        embedding = result['embedding']
+        embedding = self.rosette.text_embedding('Grandma got run over by a reindeer')
         self.assertIsNotNone(embedding)
         self.assertEqual(len(embedding), 300)
         self.assertAlmostEqual(embedding[0], 0.041, 3)
