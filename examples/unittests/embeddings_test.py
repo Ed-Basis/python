@@ -2,7 +2,7 @@
 import logging
 import unittest
 
-from examples.embeddings import Embeddings
+from examples.Embeddings import Embeddings
 from examples.Rosette import Rosette
 
 

@@ -7,7 +7,7 @@ from __future__ import print_function
 import argparse
 import logging
 
-from examples.embeddings import Embeddings
+from examples.Embeddings import Embeddings
 from examples.Rosette import Rosette
 
 

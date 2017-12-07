@@ -36,7 +36,7 @@ from sklearn.cluster import MiniBatchKMeans
 from sklearn.datasets import fetch_20newsgroups
 
 from examples.Rosette import Rosette
-from examples.embeddings import Embeddings
+from examples.Embeddings import Embeddings
 from rosette.api import RosetteException
 
 
@@ -93,7 +93,7 @@ class Clusterer(object):
                 break
             local_best = self._cluster_trials(X, n_clusters)
             self.best.compare(local_best)
-        logging.warning("self.best.n_clusters: %d  self.best.score: %0.3f" %
+        logging.debug("self.best.n_clusters: %d  self.best.score: %0.3f" %
                         (self.best.n_clusters, self.best.score))
 
     def _cluster_trials(self, X, n_clusters):
@@ -120,13 +120,13 @@ class Clusterer(object):
         t0 = time()
         clusterer.fit(X)
         elapsed = time() - t0
-        silhouette_score = metrics.silhouette_score(X, clusterer.labels_, sample_size=1000)
+        score = metrics.silhouette_score(X, clusterer.labels_, sample_size=1000)
         # calinski_harabaz_score seems to be of little use for determining number of clusters,
         #    as a lower number of clusters is always higher
         # calinski_score = metrics.calinski_harabaz_score(X, clusterer.labels_)
-        logging.info("elapsed: %0.3fs  n_clusters: %d  silhouette_score: %0.3f"
-                     % (elapsed, n_clusters, silhouette_score))
-        return Trial(n_clusters, clusterer, silhouette_score)
+        logging.info("elapsed: %0.3fs  n_clusters: %d  score: %0.3f"
+                     % (elapsed, n_clusters, score))
+        return Trial(n_clusters, clusterer, score)
 
 
 def _load_sample_data():
@@ -173,7 +173,7 @@ def _parse_args(argv):
     op.add_option('--min-clusters', type=int, default=3, help='Minimum number of clusters.')
     op.add_option('--max-clusters', type=int, default=100, help='Maximum number of clusters.')
     op.add_option('--n-trials', type=int, default=5, help='Number of times to run each trial.')
-    op.add_option('--logging', type=str, default='INFO', help='Logging level (default WARN).')
+    op.add_option('--logging', type=str, default='WARN', help='Logging level (default WARN).')
     op.add_option('--verbose', action='store_true', dest='verbose', default=False,
                   help='Print progress reports inside k-means algorithm.')
     (opts, args) = op.parse_args(argv)
