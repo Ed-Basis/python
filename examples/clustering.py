@@ -25,9 +25,8 @@
 
 from __future__ import print_function
 
+import argparse
 import logging
-import sys
-from optparse import OptionParser
 from time import time
 
 import numpy as np
@@ -35,8 +34,8 @@ from sklearn import metrics
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.datasets import fetch_20newsgroups
 
+from examples.embeddings import Embeddings
 from examples.Rosette import Rosette
-from examples.Embeddings import Embeddings
 from rosette.api import RosetteException
 
 
@@ -94,7 +93,7 @@ class Clusterer(object):
             local_best = self._cluster_trials(X, n_clusters)
             self.best.compare(local_best)
         logging.debug("self.best.n_clusters: %d  self.best.score: %0.3f" %
-                        (self.best.n_clusters, self.best.score))
+                      (self.best.n_clusters, self.best.score))
 
     def _cluster_trials(self, X, n_clusters):
         scores = []
@@ -108,6 +107,7 @@ class Clusterer(object):
         # keep the best-performing clusterer, but return the median score to avoid outliers
         local_best.score = np.median(scores)
 
+        # noinspection PyStringFormat
         logging.warning("n_clusters: %d  score: %0.3f" % (n_clusters, local_best.score))
         return local_best
 
@@ -154,7 +154,7 @@ def _load_sample_data():
         # 'talk.religion.misc',
     ]
     # Uncomment the following to include all categories
-    # categories = None
+    categories = None
     logging.warning("Loading 20 newsgroups dataset for categories: %s", categories or 'All')
     dataset = fetch_20newsgroups(subset='all', categories=categories,
                                  remove=('headers', 'footers', 'quotes'),
@@ -163,38 +163,35 @@ def _load_sample_data():
     return dataset.data
 
 
-def _parse_args(argv):
-    # parse commandline arguments
-    op = OptionParser()
-    op.add_option('--url', type=str, default='http://localhost:8181/rest/v1/', help='Rosette API URL.')
-    op.add_option('--file', type=str, help='File containing either numpy text embeddings or text data.')
-    op.add_option('--output', type=str, help='Output file for calculated text embeddings.')
-    op.add_option('--n-iters', type=int, default=100, help='Maximum number of iterations.')
-    op.add_option('--min-clusters', type=int, default=3, help='Minimum number of clusters.')
-    op.add_option('--max-clusters', type=int, default=100, help='Maximum number of clusters.')
-    op.add_option('--n-trials', type=int, default=5, help='Number of times to run each trial.')
-    op.add_option('--logging', type=str, default='WARN', help='Logging level (default WARN).')
-    op.add_option('--verbose', action='store_true', dest='verbose', default=False,
-                  help='Print progress reports inside k-means algorithm.')
-    (opts, args) = op.parse_args(argv)
-    if len(args) > 0:
-        op.error('this script takes no arguments.')
-        sys.exit(1)
-
-    logging.basicConfig(level=getattr(logging, opts.logging.upper()),
+def _parse_command_line():
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     description='Clusters a set of texts or text embeddings')
+    parser.add_argument('-k', '--key', help='Rosette API Key')
+    parser.add_argument('-u', '--url', type=str, default='http://localhost:8181/rest/v1/', help='Rosette API URL.')
+    parser.add_argument('-f', '--file', type=str, help='File containing either numpy text embeddings or text data.')
+    parser.add_argument('-o', '--output', type=str, help='Output file for calculated text embeddings.')
+    parser.add_argument('-i', '--n-iters', type=int, default=100, help='Maximum number of iterations.')
+    parser.add_argument('-c', '--min-clusters', type=int, default=3, help='Minimum number of clusters.')
+    parser.add_argument('-x', '--max-clusters', type=int, default=100, help='Maximum number of clusters.')
+    parser.add_argument('-t', '--n-trials', type=int, default=5, help='Number of times to run each trial.')
+    parser.add_argument('-l', '--logging', type=str, default='WARN', help='Logging level (default WARN).')
+    parser.add_argument('-v', '--verbose', action='store_true', dest='verbose', default=False,
+                        help='Print progress reports inside k-means algorithm.')
+    args = parser.parse_args()
+    logging.basicConfig(level=getattr(logging, args.logging.upper()),
                         format='%(asctime)s %(levelname)s %(message)s')
-    return opts
+    return args
 
 
 if __name__ == '__main__':
-    opts = _parse_args(sys.argv[1:])
+    opts = _parse_command_line()
     data = None
     embeddings = None
     if opts.file:
         (data, embeddings) = Embeddings.load(opts.file)
     else:
         data = _load_sample_data()
-    clusterer = Clusterer(rosette=Rosette(url=opts.url),
+    clusterer = Clusterer(rosette=Rosette(key=opts.key, url=opts.url),
                           min_clusters=opts.min_clusters,
                           max_clusters=opts.max_clusters,
                           n_trials=opts.n_trials,
@@ -202,4 +199,5 @@ if __name__ == '__main__':
                           verbose=opts.verbose)
     clusterer.run(data=data, embeddings=embeddings)
     if opts.output:
+        logging.warning("Writing text embeddings to: %s", opts.output)
         Embeddings.save(opts.output, clusterer.embeddings)

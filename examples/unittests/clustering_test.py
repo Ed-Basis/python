@@ -2,10 +2,9 @@
 import logging
 import unittest
 
-import numpy as np
-
 from examples.Rosette import Rosette
 from examples.clustering import Clusterer, Trial
+
 
 # TODO: imports lead to a bunch of ImportWarning's, unclear why
 
@@ -30,7 +29,6 @@ class TestClusterer(unittest.TestCase):
                 'tennis', 'Andre Agassi', 'Martina Navratilova']
         clusterer = Clusterer(rosette=rosette, min_clusters=2, max_clusters=8)
         clusterer.run(data)
-        # np.save('data', clusterer.embeddings)
         self.assertEqual(3, clusterer.best.n_clusters)
 
 

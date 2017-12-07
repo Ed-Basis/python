@@ -13,7 +13,8 @@ from rosette.api import API, DocumentParameters, RosetteException
 
 class Rosette(object):
     """
-    Simplified wrapper around Rosette API (api.py)
+    Simplified encapsulation of Rosette API (api.py)
+    TODO: process lang argument
     TODO: Accept URI data source
     """
 

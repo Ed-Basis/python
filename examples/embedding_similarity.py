@@ -7,7 +7,7 @@ from __future__ import print_function
 import argparse
 import logging
 
-from examples.Embeddings import Embeddings
+from examples.embeddings import Embeddings
 from examples.Rosette import Rosette
 
 
@@ -16,7 +16,7 @@ def embedding_similarity(key, url, arg1, arg2):
     return Embeddings(rosette).similarity(arg1, arg2)
 
 
-def parse_command_line():
+def _parse_command_line():
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s %(levelname)-7s %(message)s')
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -35,7 +35,7 @@ def parse_command_line():
 
 
 if __name__ == '__main__':
-    args = parse_command_line()
+    args = _parse_command_line()
     if args.file:
         with open(args.arg1) as f:
             data1 = f.read()
